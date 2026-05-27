@@ -107,7 +107,6 @@
     font-family: 'IBM Plex Mono', monospace;
   }
 
-  /* NOTE: supaya user bisa ngetik koma, input dibuat text (bukan number) */
   input[type="text"] {
     border: 1.5px solid #dde1f0;
     border-radius: 7px;
@@ -123,7 +122,6 @@
   input[type="text"]:focus { border-color: #3949ab; background: #fff; }
 
   input[disabled] { opacity: 0.65; cursor: not-allowed; }
-
   .unit { font-size: 0.68rem; color: #aaa; margin-left: 2px; }
 
   button {
@@ -191,7 +189,7 @@
     vertical-align: middle;
     margin: 0 3px;
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 0,80rem;
+    font-size: 0.80rem;
   }
   .sf .sn { border-bottom: 1.5px solid #37474f; padding: 0 3px 1px; text-align: center; white-space: nowrap; }
   .sf .sd { padding: 1px 3px 0; text-align: center; white-space: nowrap; }
@@ -226,11 +224,11 @@
   <div class="input-row">
     <div class="input-group">
       <label>B <span class="unit">(mT)</span></label>
-      <input type="text" id="B" value="7,8" inputmode="decimal" placeholder="contoh: 7,8">
+      <input type="text" id="B" value="7,8" inputmode="decimal">
     </div>
     <div class="input-group">
       <label>I <span class="unit">(A)</span></label>
-      <input type="text" id="I" value="0,5" inputmode="decimal" placeholder="contoh: 0,5">
+      <input type="text" id="I" value="0,5" inputmode="decimal">
     </div>
   </div>
 
@@ -241,7 +239,7 @@
     </div>
     <div class="input-group">
       <label>x <span class="unit">(m)</span></label>
-      <input type="text" id="x" value="0" inputmode="decimal" placeholder="contoh: 0">
+      <input type="text" id="x" value="0" inputmode="decimal">
     </div>
   </div>
 
@@ -260,7 +258,7 @@
 </div>
 
 <script>
-/* ========= parse + format (Indo decimal comma) ========= */
+/* ========= parse + format ========= */
 const SUP = {"0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹"};
 function toSup(nStr) { return String(nStr).split("").map(ch => SUP[ch] ?? ch).join(""); }
 
@@ -268,64 +266,56 @@ function trimZeros(str) {
   return String(str).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
 }
 
-function toIDDecimal(str) {
-  // "15.6 × 10⁻³" -> "15,6 × 10⁻³"
-  return String(str).replace(/\./g, ",");
-}
-
 function parseIDNumber(raw) {
-  // terima "7,8", "7.8", "1,2e-3", "1.2e-3"
   if (raw == null) return NaN;
   const s = String(raw).trim().replace(/\s+/g, "").replace(",", ".");
-  const v = Number(s);
-  return v;
+  return Number(s);
 }
 
+function dotToComma(str) { return String(str).replace(/\./g, ","); }
 function powText(baseHtml, supText) { return `${baseHtml}<sup>${supText}</sup>`; }
 
-function fmtSciEN(v, d = 4) {
-  // output internal: "a × 10⁻b" pakai titik, nanti diubah jadi koma untuk display
+/* Notasi ilmiah: mantissa pakai koma, tapi operatornya "x 10" */
+function fmtSciID(v, d = 4) {
   if (!isFinite(v)) return String(v);
   if (v === 0) return "0";
+
   const s = Number(v).toExponential(d);
   const m = s.match(/^([+-]?\d(?:\.\d+)?)e([+-])(\d+)$/i);
-  if (!m) return String(v);
+  if (!m) return dotToComma(String(v));
 
   const mantissa = trimZeros(m[1]);
   const sign = m[2];
   const exp = m[3];
   const signSup = (sign === "-") ? "⁻" : "";
   const expSup = toSup(exp);
-  return `${mantissa} × 10${signSup}${expSup}`;
+
+  return `${dotToComma(mantissa)} x 10${signSup}${expSup}`;
 }
 
-function fmtAutoEN(v) {
+/* angka biasa */
+function fmtAutoID(v) {
   if (!isFinite(v)) return String(v);
   if (v === 0) return "0";
+
   const av = Math.abs(v);
-  if (av >= 1e-3 && av < 1e4) return trimZeros(Number(v).toFixed(8));
-  return fmtSciEN(v, 4);
+  if (av >= 1e-3 && av < 1e4) return dotToComma(trimZeros(Number(v).toFixed(8)));
+  return fmtSciID(v, 4);
 }
 
-function fmtSciID(v, d = 4) { return toIDDecimal(fmtSciEN(v, d)); }
-function fmtAutoID(v) { return toIDDecimal(fmtAutoEN(v)); }
-
-/* ========= B: input mT -> T, tampil mantissa × 10⁻³ ========= */
+/* ========= B: input mT -> T, tampil mantissa x 10⁻³ ========= */
 function parseB_mT_to_T() {
   const raw = document.getElementById('B').value;
 
-  // jika user pakai e/E, anggap Tesla langsung
-  if (/e/i.test(String(raw))) return parseIDNumber(raw);
-
+  if (/e/i.test(String(raw))) return parseIDNumber(raw); // Tesla langsung
   const v_mT = parseIDNumber(raw);
   if (!isFinite(v_mT)) return NaN;
   return v_mT * 1e-3;
 }
-
 function fmtB_as_mT_times_10neg3_ID(B_T, d = 4) {
   const mantissa_mT = B_T / 1e-3;
-  const mantissa = trimZeros(Number(mantissa_mT).toFixed(d));
-  return toIDDecimal(`${mantissa} × 10⁻³`);
+  const mantissa = dotToComma(trimZeros(Number(mantissa_mT).toFixed(d)));
+  return `${mantissa} x 10⁻³`;
 }
 
 /* ========= fraction renderer ========= */
@@ -349,36 +339,37 @@ function hitung() {
   const den   = mu0 * I * r2;
   const n     = num / den;
 
-  // display (ID)
-  const B_disp   = fmtB_as_mT_times_10neg3_ID(B_T, 4);
-  const twoB_disp = fmtSciID(2 * B_T, 4);
-  const r_disp   = fmtSciID(r, 4);
-  const x_disp   = fmtSciID(x, 4);
-  const mu_disp  = fmtSciID(mu0, 4);
-  const I_disp   = fmtAutoID(I);
+  // display
+  const B_disp    = fmtB_as_mT_times_10neg3_ID(B_T, 4); // "7,8 x 10⁻³"
+  const twoB_disp = fmtSciID(2 * B_T, 4);              // "15,6 x 10⁻³"
+  const r_disp    = fmtSciID(r, 4);                    // "6,25 x 10⁻²"
+  const x_disp    = fmtSciID(x, 4);
+  const mu_disp   = fmtSciID(mu0, 4);                  // "1,257 x 10⁻⁶"
+  const I_disp    = fmtAutoID(I);
   const base_disp = fmtSciID(base, 4);
-  const r2_disp  = fmtSciID(r2, 4);
-  const muI_disp = fmtSciID(mu0 * I, 4);
+  const r2_disp   = fmtSciID(r2, 4);
+  const muI_disp  = fmtSciID(mu0 * I, 4);
 
   const steps = [];
 
-  // (1) substitusi penuh
+  // (1) substitusi penuh:
+  // notasi ilmiah: "x 10", tetapi perkalian biasa: "·"
   steps.push(
     `(1) n = ` + sf(
-      `${B_disp} × 2 × ${powText(`((${r_disp})² + (${x_disp})²)`, '3/2')}`,
-      `${mu_disp} × ${I_disp} × (${r_disp})²`
+      `${B_disp} · 2 · ${powText(`((${r_disp})² + (${x_disp})²)`, '3/2')}`,
+      `${mu_disp} · ${I_disp} · (${r_disp})²`
     )
   );
 
   // (2) ringkas
   steps.push(
     `(2) n = ` + sf(
-      `${twoB_disp} × ${base_disp}`,
-      `${muI_disp} × ${r2_disp}`
+      `${twoB_disp} · ${base_disp}`,
+      `${muI_disp} · ${r2_disp}`
     )
   );
 
-  // (3) final fraction
+  // (3) pecahan final
   steps.push(
     `(3) n = ` + sf(
       `${fmtSciID(num,4)}`,
@@ -387,13 +378,14 @@ function hitung() {
   );
 
   // (4) hasil
-  steps.push(`(4) n = ${toIDDecimal(trimZeros(n.toFixed(4)))} lilitan`);
+  const nTxt = dotToComma(trimZeros(n.toFixed(4)));
+  steps.push(`(4) n = ${nTxt} lilitan`);
 
   document.getElementById('steps').innerHTML =
     steps.map(s => `<div class="step">${s}</div>`).join('');
 
   document.getElementById('final').textContent =
-    `n = ${toIDDecimal(trimZeros(n.toFixed(4)))} lilitan ≈ ${Math.round(n)} lilitan`;
+    `n = ${nTxt} lilitan ≈ ${Math.round(n)} lilitan`;
 
   document.getElementById('result').style.display = 'block';
 }
